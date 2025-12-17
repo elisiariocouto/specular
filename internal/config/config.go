@@ -2,8 +2,11 @@ package config
 
 import (
 	"errors"
+	"fmt"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -37,56 +40,40 @@ type Config struct {
 func Load() (*Config, error) {
 	cfg := &Config{
 		// Defaults
-		Port:             8080,
-		Host:             "0.0.0.0",
-		ReadTimeout:      30 * time.Second,
-		WriteTimeout:     30 * time.Second,
-		ShutdownTimeout:  30 * time.Second,
+		Port:            8080,
+		Host:            "0.0.0.0",
+		ReadTimeout:     30 * time.Second,
+		WriteTimeout:    30 * time.Second,
+		ShutdownTimeout: 30 * time.Second,
 		StorageType:     "filesystem",
 		CacheDir:        "/var/cache/speculum",
 		UpstreamTimeout: 60 * time.Second,
-		MaxRetries:       3,
-		BaseURL:          "http://localhost:8080",
-		LogLevel:         "info",
-		LogFormat:        "json",
-		MetricsEnabled:   true,
+		MaxRetries:      3,
+		BaseURL:         "http://localhost:8080",
+		LogLevel:        "info",
+		LogFormat:       "json",
+		MetricsEnabled:  true,
 	}
 
 	// Override with environment variables
-	if v := os.Getenv("SPECULUM_PORT"); v != "" {
-		port, err := strconv.Atoi(v)
-		if err != nil {
-			return nil, errors.New("SPECULUM_PORT must be a valid integer")
-		}
-		cfg.Port = port
+	if err := setEnvInt("SPECULUM_PORT", &cfg.Port, "must be a valid integer"); err != nil {
+		return nil, err
 	}
 
 	if v := os.Getenv("SPECULUM_HOST"); v != "" {
 		cfg.Host = v
 	}
 
-	if v := os.Getenv("SPECULUM_READ_TIMEOUT"); v != "" {
-		duration, err := time.ParseDuration(v)
-		if err != nil {
-			return nil, errors.New("SPECULUM_READ_TIMEOUT must be a valid duration (e.g., 30s)")
-		}
-		cfg.ReadTimeout = duration
+	if err := setEnvDuration("SPECULUM_READ_TIMEOUT", &cfg.ReadTimeout, "must be a valid duration (e.g., 30s)"); err != nil {
+		return nil, err
 	}
 
-	if v := os.Getenv("SPECULUM_WRITE_TIMEOUT"); v != "" {
-		duration, err := time.ParseDuration(v)
-		if err != nil {
-			return nil, errors.New("SPECULUM_WRITE_TIMEOUT must be a valid duration (e.g., 30s)")
-		}
-		cfg.WriteTimeout = duration
+	if err := setEnvDuration("SPECULUM_WRITE_TIMEOUT", &cfg.WriteTimeout, "must be a valid duration (e.g., 30s)"); err != nil {
+		return nil, err
 	}
 
-	if v := os.Getenv("SPECULUM_SHUTDOWN_TIMEOUT"); v != "" {
-		duration, err := time.ParseDuration(v)
-		if err != nil {
-			return nil, errors.New("SPECULUM_SHUTDOWN_TIMEOUT must be a valid duration (e.g., 30s)")
-		}
-		cfg.ShutdownTimeout = duration
+	if err := setEnvDuration("SPECULUM_SHUTDOWN_TIMEOUT", &cfg.ShutdownTimeout, "must be a valid duration (e.g., 30s)"); err != nil {
+		return nil, err
 	}
 
 	if v := os.Getenv("SPECULUM_STORAGE_TYPE"); v != "" {
@@ -97,20 +84,12 @@ func Load() (*Config, error) {
 		cfg.CacheDir = v
 	}
 
-	if v := os.Getenv("SPECULUM_UPSTREAM_TIMEOUT"); v != "" {
-		duration, err := time.ParseDuration(v)
-		if err != nil {
-			return nil, errors.New("SPECULUM_UPSTREAM_TIMEOUT must be a valid duration (e.g., 60s)")
-		}
-		cfg.UpstreamTimeout = duration
+	if err := setEnvDuration("SPECULUM_UPSTREAM_TIMEOUT", &cfg.UpstreamTimeout, "must be a valid duration (e.g., 60s)"); err != nil {
+		return nil, err
 	}
 
-	if v := os.Getenv("SPECULUM_UPSTREAM_MAX_RETRIES"); v != "" {
-		retries, err := strconv.Atoi(v)
-		if err != nil {
-			return nil, errors.New("SPECULUM_UPSTREAM_MAX_RETRIES must be a valid integer")
-		}
-		cfg.MaxRetries = retries
+	if err := setEnvInt("SPECULUM_UPSTREAM_MAX_RETRIES", &cfg.MaxRetries, "must be a valid integer"); err != nil {
+		return nil, err
 	}
 
 	if v := os.Getenv("SPECULUM_BASE_URL"); v != "" {
@@ -125,12 +104,8 @@ func Load() (*Config, error) {
 		cfg.LogFormat = v
 	}
 
-	if v := os.Getenv("SPECULUM_METRICS_ENABLED"); v != "" {
-		enabled, err := strconv.ParseBool(v)
-		if err != nil {
-			return nil, errors.New("SPECULUM_METRICS_ENABLED must be true or false")
-		}
-		cfg.MetricsEnabled = enabled
+	if err := setEnvBool("SPECULUM_METRICS_ENABLED", &cfg.MetricsEnabled, "must be true or false"); err != nil {
+		return nil, err
 	}
 
 	// Validate configuration
@@ -143,36 +118,47 @@ func Load() (*Config, error) {
 
 // Validate checks that configuration values are valid
 func (c *Config) Validate() error {
+	var errs []error
+
 	if c.Port < 1 || c.Port > 65535 {
-		return errors.New("port must be between 1 and 65535")
+		errs = append(errs, errors.New("port must be between 1 and 65535"))
+	}
+
+	if strings.TrimSpace(c.Host) == "" {
+		errs = append(errs, errors.New("host must not be empty"))
 	}
 
 	if c.ReadTimeout <= 0 {
-		return errors.New("read timeout must be positive")
+		errs = append(errs, errors.New("read timeout must be positive"))
 	}
 
 	if c.WriteTimeout <= 0 {
-		return errors.New("write timeout must be positive")
+		errs = append(errs, errors.New("write timeout must be positive"))
 	}
 
 	if c.ShutdownTimeout <= 0 {
-		return errors.New("shutdown timeout must be positive")
+		errs = append(errs, errors.New("shutdown timeout must be positive"))
 	}
 
 	if c.UpstreamTimeout <= 0 {
-		return errors.New("upstream timeout must be positive")
+		errs = append(errs, errors.New("upstream timeout must be positive"))
 	}
 
 	if c.MaxRetries < 0 {
-		return errors.New("max retries must not be negative")
+		errs = append(errs, errors.New("max retries must not be negative"))
 	}
 
 	if c.CacheDir == "" {
-		return errors.New("cache directory must not be empty")
+		errs = append(errs, errors.New("cache directory must not be empty"))
 	}
 
 	if c.BaseURL == "" {
-		return errors.New("base URL must not be empty")
+		errs = append(errs, errors.New("base URL must not be empty"))
+	} else {
+		parsed, err := url.Parse(c.BaseURL)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			errs = append(errs, errors.New("base URL must be a valid URL with scheme and host"))
+		}
 	}
 
 	validLogLevels := map[string]bool{
@@ -182,7 +168,7 @@ func (c *Config) Validate() error {
 		"error": true,
 	}
 	if !validLogLevels[c.LogLevel] {
-		return errors.New("log level must be debug, info, warn, or error")
+		errs = append(errs, errors.New("log level must be debug, info, warn, or error"))
 	}
 
 	validLogFormats := map[string]bool{
@@ -190,7 +176,49 @@ func (c *Config) Validate() error {
 		"text": true,
 	}
 	if !validLogFormats[c.LogFormat] {
-		return errors.New("log format must be json or text")
+		errs = append(errs, errors.New("log format must be json or text"))
+	}
+
+	validStorageTypes := map[string]bool{
+		"filesystem": true,
+		"memory":     true,
+	}
+	if !validStorageTypes[c.StorageType] {
+		errs = append(errs, errors.New("storage type must be filesystem or memory"))
+	}
+
+	return errors.Join(errs...)
+}
+
+func setEnvInt(key string, target *int, errMsg string) error {
+	if v := os.Getenv(key); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			return fmt.Errorf("%s %s", key, errMsg)
+		}
+		*target = parsed
+	}
+	return nil
+}
+
+func setEnvDuration(key string, target *time.Duration, errMsg string) error {
+	if v := os.Getenv(key); v != "" {
+		duration, err := time.ParseDuration(v)
+		if err != nil {
+			return fmt.Errorf("%s %s", key, errMsg)
+		}
+		*target = duration
+	}
+	return nil
+}
+
+func setEnvBool(key string, target *bool, errMsg string) error {
+	if v := os.Getenv(key); v != "" {
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			return fmt.Errorf("%s %s", key, errMsg)
+		}
+		*target = parsed
 	}
 
 	return nil
