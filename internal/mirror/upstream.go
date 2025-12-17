@@ -7,14 +7,12 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 )
 
 // UpstreamClient handles fetching from the upstream registry
 type UpstreamClient struct {
-	baseURL        string
 	httpClient     *http.Client
 	maxRetries     int
 	logger         *slog.Logger
@@ -22,7 +20,7 @@ type UpstreamClient struct {
 }
 
 // NewUpstreamClient creates a new upstream client
-func NewUpstreamClient(baseURL string, timeout time.Duration, maxRetries int, logger *slog.Logger) *UpstreamClient {
+func NewUpstreamClient(timeout time.Duration, maxRetries int, logger *slog.Logger) *UpstreamClient {
 	// Create HTTP client with connection pooling and timeouts
 	httpClient := &http.Client{
 		Timeout: timeout,
@@ -38,7 +36,6 @@ func NewUpstreamClient(baseURL string, timeout time.Duration, maxRetries int, lo
 	discoveryCache := NewDiscoveryCache(1*time.Hour, httpClient, logger)
 
 	return &UpstreamClient{
-		baseURL:        baseURL,
 		httpClient:     httpClient,
 		maxRetries:     maxRetries,
 		logger:         logger,
@@ -77,8 +74,7 @@ func (uc *UpstreamClient) FetchIndex(ctx context.Context, hostname, namespace, p
 			slog.String("hostname", hostname),
 			slog.String("error", err.Error()))
 		// Fallback to mirror protocol format
-		path := fmt.Sprintf("%s/%s/%s/index.json", hostname, namespace, providerType)
-		url := uc.buildURL(path)
+		url := fmt.Sprintf("https://%s/%s/%s/index.json", hostname, namespace, providerType)
 
 		body, status, fetchErr := uc.fetch(ctx, url)
 		if fetchErr != nil {
@@ -144,8 +140,7 @@ func (uc *UpstreamClient) FetchVersion(ctx context.Context, hostname, namespace,
 	}
 
 	// Fallback: use provider network mirror protocol format
-	path := fmt.Sprintf("%s/%s/%s/%s.json", hostname, namespace, providerType, version)
-	url := uc.buildURL(path)
+	url := fmt.Sprintf("https://%s/%s/%s/%s.json", hostname, namespace, providerType, version)
 
 	uc.logger.DebugContext(ctx, "fetching version metadata from mirror protocol",
 		slog.String("url", url))
@@ -172,22 +167,8 @@ func (uc *UpstreamClient) FetchVersion(ctx context.Context, hostname, namespace,
 }
 
 // FetchArchive fetches a provider archive from a URL
+// The archiveURL must be an absolute URL
 func (uc *UpstreamClient) FetchArchive(ctx context.Context, archiveURL string) (io.ReadCloser, error) {
-	// If the URL is relative, make it absolute
-	if !isAbsoluteURL(archiveURL) {
-		baseURL, err := url.Parse(uc.baseURL)
-		if err != nil {
-			return nil, fmt.Errorf("invalid base URL: %w", err)
-		}
-
-		archiveURLPath, err := url.Parse(archiveURL)
-		if err != nil {
-			return nil, fmt.Errorf("invalid archive URL: %w", err)
-		}
-
-		archiveURL = baseURL.ResolveReference(archiveURLPath).String()
-	}
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, archiveURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -335,20 +316,3 @@ func (uc *UpstreamClient) FetchDownloadURL(ctx context.Context, hostname, namesp
 	return &info, nil
 }
 
-// buildURL builds a complete URL from the base URL and path
-func (uc *UpstreamClient) buildURL(path string) string {
-	return uc.baseURL + "/" + path
-}
-
-// isAbsoluteURL checks if a URL is absolute
-func isAbsoluteURL(rawURL string) bool {
-	_, err := url.Parse(rawURL)
-	if err != nil {
-		return false
-	}
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return false
-	}
-	return u.IsAbs()
-}

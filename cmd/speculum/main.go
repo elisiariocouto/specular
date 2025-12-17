@@ -33,7 +33,6 @@ func main() {
 		slog.String("storage_type", cfg.StorageType),
 		slog.String("cache_dir", cfg.CacheDir),
 		slog.String("base_url", cfg.BaseURL),
-		slog.String("upstream_registry", cfg.UpstreamRegistry),
 	)
 
 	// Initialize storage backend
@@ -60,7 +59,6 @@ func main() {
 
 	// Initialize upstream client
 	upstreamClient := mirror.NewUpstreamClient(
-		cfg.UpstreamRegistry,
 		cfg.UpstreamTimeout,
 		cfg.MaxRetries,
 		log,

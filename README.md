@@ -71,7 +71,6 @@ All configuration is via environment variables:
 - `SPECULUM_CACHE_DIR` (default: `/var/cache/speculum`) - Cache directory
 
 ### Upstream Configuration
-- `SPECULUM_UPSTREAM_REGISTRY` (default: `https://registry.terraform.io`) - Upstream registry URL
 - `SPECULUM_UPSTREAM_TIMEOUT` (default: `60s`) - Upstream request timeout
 - `SPECULUM_UPSTREAM_MAX_RETRIES` (default: `3`) - Max retry attempts
 

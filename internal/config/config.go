@@ -21,9 +21,8 @@ type Config struct {
 	CacheDir    string
 
 	// Upstream configuration
-	UpstreamRegistry string
-	UpstreamTimeout  time.Duration
-	MaxRetries       int
+	UpstreamTimeout time.Duration
+	MaxRetries      int
 
 	// Mirror configuration
 	BaseURL string
@@ -43,10 +42,9 @@ func Load() (*Config, error) {
 		ReadTimeout:      30 * time.Second,
 		WriteTimeout:     30 * time.Second,
 		ShutdownTimeout:  30 * time.Second,
-		StorageType:      "filesystem",
-		CacheDir:         "/var/cache/speculum",
-		UpstreamRegistry: "https://registry.terraform.io",
-		UpstreamTimeout:  60 * time.Second,
+		StorageType:     "filesystem",
+		CacheDir:        "/var/cache/speculum",
+		UpstreamTimeout: 60 * time.Second,
 		MaxRetries:       3,
 		BaseURL:          "http://localhost:8080",
 		LogLevel:         "info",
@@ -97,10 +95,6 @@ func Load() (*Config, error) {
 
 	if v := os.Getenv("SPECULUM_CACHE_DIR"); v != "" {
 		cfg.CacheDir = v
-	}
-
-	if v := os.Getenv("SPECULUM_UPSTREAM_REGISTRY"); v != "" {
-		cfg.UpstreamRegistry = v
 	}
 
 	if v := os.Getenv("SPECULUM_UPSTREAM_TIMEOUT"); v != "" {
