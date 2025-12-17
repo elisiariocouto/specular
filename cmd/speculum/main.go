@@ -67,8 +67,15 @@ func main() {
 	// Initialize mirror service
 	mirrorService := mirror.NewMirror(storageBackend, upstreamClient, cfg.BaseURL)
 
-	// Initialize metrics
-	m := metrics.New()
+	// Initialize metrics conditionally
+	var m *metrics.Metrics
+	if cfg.MetricsEnabled {
+		m = metrics.New()
+		log.InfoContext(context.Background(), "metrics enabled")
+	} else {
+		m = nil
+		log.InfoContext(context.Background(), "metrics disabled")
+	}
 
 	// Create HTTP server
 	httpServer := server.New(

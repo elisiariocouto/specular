@@ -232,6 +232,13 @@ func (h *Handlers) HealthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // MetricsHandler returns the Prometheus metrics handler
+// Returns 404 if metrics are disabled
 func (h *Handlers) MetricsHandler() http.Handler {
-	return promhttp.Handler()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h.metrics == nil {
+			http.NotFound(w, r)
+			return
+		}
+		promhttp.Handler().ServeHTTP(w, r)
+	})
 }
