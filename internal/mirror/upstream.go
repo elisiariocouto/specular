@@ -292,9 +292,9 @@ func (uc *UpstreamClient) convertRegistryAPIToIndexResponse(data []byte) (*Index
 	}
 
 	// Convert to mirror protocol format
-	versions := make(map[string]interface{})
+	versions := make(map[string]VersionInfo)
 	for _, v := range registryResponse.Versions {
-		versions[v.Version] = struct{}{}
+		versions[v.Version] = VersionInfo{}
 	}
 
 	indexResponse := &IndexResponse{

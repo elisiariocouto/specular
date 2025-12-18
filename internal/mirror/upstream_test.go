@@ -31,6 +31,7 @@ func TestNewUpstreamClient(t *testing.T) {
 
 	if client == nil {
 		t.Errorf("expected non-nil client")
+		return
 	}
 	if client.maxRetries != 3 {
 		t.Errorf("maxRetries = %d, want 3", client.maxRetries)
@@ -383,6 +384,7 @@ func TestFetchIndex_Success(t *testing.T) {
 
 	if indexResp == nil {
 		t.Errorf("expected non-nil index response")
+		return
 	}
 	if _, ok := indexResp.Versions["1.0.0"]; !ok {
 		t.Errorf("expected version 1.0.0 in response")
@@ -455,6 +457,7 @@ func TestFetchDownloadURL_Success(t *testing.T) {
 
 	if info == nil {
 		t.Errorf("expected non-nil download info")
+		return
 	}
 	if !strings.Contains(info.DownloadURL, "terraform-provider-aws") {
 		t.Errorf("unexpected download URL: %s", info.DownloadURL)

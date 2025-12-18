@@ -1,16 +1,27 @@
 package mirror
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"net/url"
+)
 
 var (
 	// ErrNotFound is returned when a provider is not found upstream
 	ErrNotFound = errors.New("provider not found")
+	// ErrInvalidURL is returned when a URL is invalid
+	ErrInvalidURL = errors.New("invalid URL")
+	// ErrInvalidAddress is returned when a provider address is invalid
+	ErrInvalidAddress = errors.New("invalid provider address")
 )
+
+// VersionInfo contains metadata about a provider version
+type VersionInfo struct{}
 
 // IndexResponse represents the response to a provider index request
 // Returned by GET /:hostname/:namespace/:type/index.json
 type IndexResponse struct {
-	Versions map[string]interface{} `json:"versions"`
+	Versions map[string]VersionInfo `json:"versions"`
 }
 
 // VersionResponse represents the response to a provider version request
@@ -23,6 +34,18 @@ type VersionResponse struct {
 type Archive struct {
 	URL    string   `json:"url"`
 	Hashes []string `json:"hashes,omitempty"`
+}
+
+// ValidateURL checks if the archive URL is valid
+func (a *Archive) ValidateURL() error {
+	if a.URL == "" {
+		return ErrInvalidURL
+	}
+	_, err := url.Parse(a.URL)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidURL, err)
+	}
+	return nil
 }
 
 // RegistryVersionsResponse is the full response from the registry /versions API
@@ -55,9 +78,16 @@ type ProviderAddress struct {
 	Type      string
 }
 
-// ParseProviderAddress parses a provider registry address like "registry.terraform.io/hashicorp/aws"
-func ParseProviderAddress(addr string) *ProviderAddress {
-	// For now, just store it as-is since this is mainly for demonstration
-	// Real parsing would split on "/" and handle defaults
-	return &ProviderAddress{}
+// Validate checks if the provider address is valid
+func (p *ProviderAddress) Validate() error {
+	if p.Hostname == "" {
+		return fmt.Errorf("%w: hostname is required", ErrInvalidAddress)
+	}
+	if p.Namespace == "" {
+		return fmt.Errorf("%w: namespace is required", ErrInvalidAddress)
+	}
+	if p.Type == "" {
+		return fmt.Errorf("%w: type is required", ErrInvalidAddress)
+	}
+	return nil
 }
