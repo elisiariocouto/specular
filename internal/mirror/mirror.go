@@ -92,7 +92,7 @@ func (m *Mirror) GetVersion(ctx context.Context, hostname, namespace, providerTy
 	_ = m.storage.PutVersion(ctx, hostname, namespace, providerType, version, data)
 
 	// Rewrite archive URLs
-	return m.rewriteArchiveURLs(ctx, hostname, namespace, providerType, data)
+	return m.rewriteArchiveURLs(ctx, hostname, namespace, providerType, version, data)
 }
 
 // buildVersionFromCache builds a version.json response from the cached versions response
@@ -134,9 +134,7 @@ func (m *Mirror) buildVersionFromCache(ctx context.Context, hostname, namespace,
 			providerType, version, platform.OS, platform.Arch)
 
 		// Build URL pointing to mirror's download endpoint
-		archiveURL := fmt.Sprintf("%s/download/%s/%s/%s/%s/%s/%s/%s",
-			strings.TrimSuffix(m.baseURL, "/"),
-			hostname, namespace, providerType, version, platform.OS, platform.Arch, filename)
+		archiveURL := m.buildDownloadURL(hostname, namespace, providerType, version, platform.OS, platform.Arch, filename)
 
 		response.Archives[platformKey] = Archive{
 			URL:    archiveURL,
@@ -195,7 +193,7 @@ func (m *Mirror) GetArchive(ctx context.Context, hostname, namespace, providerTy
 
 // rewriteArchiveURLs rewrites archive URLs to point to this mirror
 // For mirror protocol registries only (not used for service discovery-based registries)
-func (m *Mirror) rewriteArchiveURLs(ctx context.Context, hostname, namespace, providerType string, data []byte) ([]byte, error) {
+func (m *Mirror) rewriteArchiveURLs(ctx context.Context, hostname, namespace, providerType, version string, data []byte) ([]byte, error) {
 	var response VersionResponse
 	if err := json.Unmarshal(data, &response); err != nil {
 		return nil, fmt.Errorf("failed to parse version response: %w", err)
@@ -212,14 +210,9 @@ func (m *Mirror) rewriteArchiveURLs(ctx context.Context, hostname, namespace, pr
 			parts := strings.Split(platform, "_")
 			if len(parts) == 2 {
 				os, arch := parts[0], parts[1]
-				// Extract version from filename (this is a fallback for mirror protocol)
-				// The filename typically follows: terraform-provider-{type}_{version}_{os}_{arch}.zip
-				version := extractVersionFromFilename(filename, providerType)
 
 				// Build URL pointing to download endpoint
-				archiveURL := fmt.Sprintf("%s/download/%s/%s/%s/%s/%s/%s/%s",
-					strings.TrimSuffix(m.baseURL, "/"),
-					hostname, namespace, providerType, version, os, arch, filename)
+				archiveURL := m.buildDownloadURL(hostname, namespace, providerType, version, os, arch, filename)
 
 				archive.URL = archiveURL
 			}
@@ -236,22 +229,6 @@ func (m *Mirror) rewriteArchiveURLs(ctx context.Context, hostname, namespace, pr
 	}
 
 	return rewritten, nil
-}
-
-// extractVersionFromFilename extracts version from a provider archive filename
-// Example: terraform-provider-aws_5.0.0_linux_amd64.zip -> 5.0.0
-func extractVersionFromFilename(filename, providerType string) string {
-	// Remove terraform-provider- prefix and .zip suffix
-	prefix := fmt.Sprintf("terraform-provider-%s_", providerType)
-	name := strings.TrimPrefix(filename, prefix)
-	name = strings.TrimSuffix(name, ".zip")
-
-	// Split by underscore and take all but last 2 (os_arch)
-	parts := strings.Split(name, "_")
-	if len(parts) <= 2 {
-		return ""
-	}
-	return strings.Join(parts[:len(parts)-2], "_")
 }
 
 // extractFilename extracts just the filename from an archive URL
@@ -275,4 +252,11 @@ func (m *Mirror) extractFilename(archiveURL string) string {
 	}
 
 	return "archive.zip"
+}
+
+// buildDownloadURL constructs a download URL for a provider archive
+func (m *Mirror) buildDownloadURL(hostname, namespace, providerType, version, os, arch, filename string) string {
+	return fmt.Sprintf("%s/download/%s/%s/%s/%s/%s/%s/%s",
+		strings.TrimSuffix(m.baseURL, "/"),
+		hostname, namespace, providerType, version, os, arch, filename)
 }
