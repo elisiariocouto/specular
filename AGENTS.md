@@ -6,6 +6,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Speculum is a caching proxy mirror for Terraform providers that implements the [Terraform Provider Network Mirror Protocol](https://developer.hashicorp.com/terraform/internals/provider-network-mirror-protocol). It intercepts provider requests, caches them locally, and serves subsequent requests from cache.
 
+## Setup for Development
+
+### Prerequisites
+- Go 1.22 or later
+- pre-commit installed (`pip install pre-commit` or `brew install pre-commit`)
+
+### Initial Setup
+1. Clone the repository
+2. Run `make deps` to download dependencies
+3. Run `pre-commit install` to set up pre-commit hooks
+4. Configure environment variables (see "Running Locally" section below)
+
+### Pre-commit Hooks
+Pre-commit hooks will automatically run before each commit to:
+- Format code with `go fmt` and `goimports`
+- Run linters with `go vet` and `staticcheck`
+- Run tests to ensure nothing is broken
+
+If pre-commit fails, the commit is canceled. Fix the issues and try again.
+
+To run pre-commit manually on all files:
+```bash
+pre-commit run --all-files
+```
+
+To skip pre-commit hooks (not recommended):
+```bash
+git commit --no-verify
+```
+
 ## Commands
 
 ### Building and Running

@@ -3,6 +3,10 @@
 BINARY_NAME=speculum
 GO=go
 GOFLAGS=-v
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+GO_LDFLAGS := -s -w -X github.com/elisiariocouto/speculum/internal/version.Version=$(VERSION) -X github.com/elisiariocouto/speculum/internal/version.Commit=$(COMMIT) -X github.com/elisiariocouto/speculum/internal/version.BuildDate=$(BUILD_DATE)
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -12,7 +16,7 @@ help: ## Show this help message
 
 build: ## Build the application
 	@echo "Building $(BINARY_NAME)..."
-	$(GO) build $(GOFLAGS) -o bin/$(BINARY_NAME) ./cmd/speculum
+	$(GO) build $(GOFLAGS) -ldflags "$(GO_LDFLAGS)" -o bin/$(BINARY_NAME) ./cmd/speculum
 
 run: build ## Build and run the application
 	./bin/$(BINARY_NAME)

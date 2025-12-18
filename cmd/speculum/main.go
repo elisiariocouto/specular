@@ -14,6 +14,7 @@ import (
 	"github.com/elisiariocouto/speculum/internal/mirror"
 	"github.com/elisiariocouto/speculum/internal/server"
 	"github.com/elisiariocouto/speculum/internal/storage"
+	"github.com/elisiariocouto/speculum/internal/version"
 )
 
 func main() {
@@ -28,6 +29,9 @@ func main() {
 	log := logger.SetupLogger(cfg.LogLevel, cfg.LogFormat)
 
 	log.InfoContext(context.Background(), "Speculum starting",
+		slog.String("version", version.Version),
+		slog.String("commit", version.Commit),
+		slog.String("build_date", version.BuildDate),
 		slog.Int("port", cfg.Port),
 		slog.String("host", cfg.Host),
 		slog.String("storage_type", cfg.StorageType),
