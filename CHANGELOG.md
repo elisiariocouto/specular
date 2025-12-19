@@ -1,4 +1,12 @@
 
+## 2025.12.2 (2025/12/19)
+
+### Features
+
+-  Add alpine-based container image options. ([57e42c67](https://github.com/elisiariocouto/specular/commit/57e42c670b80b8174760702043456ae262c4ba3d))
+
+
+
 ## 2025.12.1 (2025/12/19)
 
 ### Documentation
