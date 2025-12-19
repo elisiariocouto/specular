@@ -83,7 +83,23 @@ func (m *Mirror) GetVersion(ctx context.Context, hostname, namespace, providerTy
 	if err != nil {
 		// If upstream returns ErrNotFound, build from cached versions response
 		if errors.Is(err, ErrNotFound) {
-			return m.buildVersionFromCache(ctx, hostname, namespace, providerType, version)
+			data, buildErr := m.buildVersionFromCache(ctx, hostname, namespace, providerType, version)
+			// If versions cache is empty, fetch the index first to populate it
+			if buildErr != nil {
+				slog.DebugContext(ctx, "versions cache empty, fetching index first",
+					"hostname", hostname,
+					"namespace", namespace,
+					"type", providerType,
+					"version", version)
+				if _, indexErr := m.GetIndex(ctx, hostname, namespace, providerType); indexErr == nil {
+					// Retry building from cache after fetching index
+					data, buildErr = m.buildVersionFromCache(ctx, hostname, namespace, providerType, version)
+				}
+			}
+			if buildErr != nil {
+				return nil, buildErr
+			}
+			return data, nil
 		}
 		return nil, err
 	}
