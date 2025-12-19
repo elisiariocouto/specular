@@ -1,6 +1,6 @@
 # 🪞 Speculum
 
-Speculum is an open-source Terraform network mirror that provides caching, control, and reproducibility for infrastructure dependencies. This might evolve into a generic proxy mirror for other packages/artifacts.
+Speculum is an open-source Terraform provider network mirror. This might evolve into a generic proxy mirror for other packages/artifacts.
 
 Speculum implements the [Terraform Provider Network Mirror Protocol](https://developer.hashicorp.com/terraform/internals/provider-network-mirror-protocol) to intercept provider requests, cache them locally, and serve subsequent requests from cache. This reduces dependency on upstream registries and improves deployment speeds.
 
@@ -10,10 +10,6 @@ Speculum implements the [Terraform Provider Network Mirror Protocol](https://dev
 - **Simple Configuration**: Environment variable-based configuration
 - **Observability**: Prometheus metrics and structured logging
 - **Extensible Storage**: Filesystem storage with interface for future S3 support
-
-## Requirements
-
-- Go 1.21 or later
 
 ## Quick Start
 
@@ -28,12 +24,12 @@ Alternatively, run Speculum using Docker:
 ```bash
 # Docker Hub
 docker run -p 8080:8080 \
-  -e SPECULUM_BASE_URL=https://speculum.example.com \
+  -e SPECULUM_BASE_URL=https://speculum.example.com/ \
   elisiariocouto/speculum:latest
 
 # GitHub Container Registry
 docker run -p 8080:8080 \
-  -e SPECULUM_BASE_URL=https://speculum.example.com \
+  -e SPECULUM_BASE_URL=https://speculum.example.com/ \
   ghcr.io/elisiariocouto/speculum:latest
 ```
 
@@ -44,7 +40,7 @@ Configure Terraform to use the mirror by adding to `~/.terraformrc`:
 ```hcl
 provider_installation {
   network_mirror {
-    url = "https://speculum.example.com/terraform/providers/"
+    url = "https://speculum.example.com/"
   }
 }
 ```
@@ -71,7 +67,7 @@ All configuration is via environment variables:
 - `SPECULUM_UPSTREAM_MAX_RETRIES` (default: `3`) - Max retry attempts
 
 ### Mirror Configuration
-- `SPECULUM_BASE_URL` (default: `https://speculum.example.com`) - Public base URL of mirror
+- `SPECULUM_BASE_URL` (default: `https://speculum.example.com`) - Public base URL of mirror, supports paths
 
 ### Observability Configuration
 - `SPECULUM_LOG_LEVEL` (default: `info`) - Log level: debug, info, warn, error
@@ -82,14 +78,14 @@ All configuration is via environment variables:
 
 ### List Versions
 ```
-GET /terraform/providers/:hostname/:namespace/:type/index.json
+GET $SPECULUM_BASE_URL/:hostname/:namespace/:type/index.json
 ```
 
 Returns available versions of a provider.
 
 ### List Packages
 ```
-GET /terraform/providers/:hostname/:namespace/:type/:version.json
+GET $SPECULUM_BASE_URL/:hostname/:namespace/:type/:version.json
 ```
 
 Returns available installation packages for a specific version.
@@ -126,7 +122,7 @@ The mirror consists of several layers:
 
 - S3 storage backend
 - Cache invalidation API
-- Pre-warming cache
+- Pre-warming cache (already supported since the filesystem structure is the same as `terraform providers mirror`)
 - Authentication and authorization
 - Rate limiting
-- Support for other ecosystems (Docker, npm, PyPI)
+- Support for other ecosystems (Docker, npm, PyPI, nuget, maven)
