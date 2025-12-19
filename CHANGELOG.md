@@ -1,4 +1,18 @@
 
+## 2025.12.1 (2025/12/19)
+
+### Documentation
+
+-  Warn that terraform needs HTTPS with a valid certificate. ([e9e93510](https://github.com/elisiariocouto/specular/commit/e9e93510a58b955b5354c0179f636f2635acee4a))
+-  Fix quick start discrepancies. ([3391c527](https://github.com/elisiariocouto/specular/commit/3391c5276f5fe9789e47f77c86d238c15935d5b6))
+
+
+### Miscellaneous Tasks
+
+-  Rename project. ([bc00165d](https://github.com/elisiariocouto/specular/commit/bc00165d3f6258f7ff8b2c7c9cf6dc2999183dbd))
+
+
+
 ## 2025.12.0 (2025/12/18)
 
 ### Bug Fixes
