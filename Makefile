@@ -55,10 +55,19 @@ deps: ## Download and tidy dependencies
 	$(GO) mod tidy
 
 docker-build: ## Build Docker image
-	docker build -t $(BINARY_NAME):latest .
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t $(BINARY_NAME):latest .
 
 docker-build-alpine: ## Build Alpine Docker image
-	docker build -f Dockerfile.alpine -t $(BINARY_NAME):latest-alpine .
+	docker build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-f Dockerfile.alpine \
+		-t $(BINARY_NAME):latest-alpine .
 
 docker-run: docker-build ## Build and run Docker container
 	docker run -p 8080:8080 -v /tmp/specular-cache:/var/cache/specular $(BINARY_NAME):latest
