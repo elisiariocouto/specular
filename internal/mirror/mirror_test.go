@@ -445,7 +445,7 @@ func TestRewriteArchiveURLs(t *testing.T) {
 	json.Unmarshal(rewritten, &result)
 
 	for platform, archive := range result.Archives {
-		if !strings.Contains(archive.URL, "localhost:8080/download") {
+		if !strings.Contains(archive.URL, "localhost:8080/terraform/providers/download") {
 			t.Errorf("platform %s: URL not rewritten, got %s", platform, archive.URL)
 		}
 		if !strings.Contains(archive.URL, "terraform-provider-aws_1.0.0") {
@@ -546,12 +546,12 @@ func TestBuildDownloadURL(t *testing.T) {
 		{
 			name:    "URL without trailing slash",
 			baseURL: "http://localhost:8080",
-			wantURL: "http://localhost:8080/download/registry.terraform.io/hashicorp/aws/1.0.0/linux/amd64/terraform-provider-aws_1.0.0_linux_amd64.zip",
+			wantURL: "http://localhost:8080/terraform/providers/download/registry.terraform.io/hashicorp/aws/1.0.0/linux/amd64/terraform-provider-aws_1.0.0_linux_amd64.zip",
 		},
 		{
 			name:    "URL with trailing slash",
 			baseURL: "http://localhost:8080/",
-			wantURL: "http://localhost:8080/download/registry.terraform.io/hashicorp/aws/1.0.0/linux/amd64/terraform-provider-aws_1.0.0_linux_amd64.zip",
+			wantURL: "http://localhost:8080/terraform/providers/download/registry.terraform.io/hashicorp/aws/1.0.0/linux/amd64/terraform-provider-aws_1.0.0_linux_amd64.zip",
 		},
 	}
 
