@@ -278,7 +278,7 @@ func (m *Mirror) extractFilename(archiveURL string) string {
 
 // buildDownloadURL constructs a download URL for a provider archive
 func (m *Mirror) buildDownloadURL(hostname, namespace, providerType, version, os, arch, filename string) string {
-	return fmt.Sprintf("%s/download/%s/%s/%s/%s/%s/%s/%s",
+	return fmt.Sprintf("%s/terraform/providers/download/%s/%s/%s/%s/%s/%s/%s",
 		strings.TrimSuffix(m.baseURL, "/"),
 		hostname, namespace, providerType, version, os, arch, filename)
 }
