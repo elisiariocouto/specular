@@ -56,6 +56,7 @@ Then run `terraform init` in any Terraform project and it will use your local mi
 All configuration is via environment variables:
 
 ### Server Configuration
+- `SPECULAR_BASE_URL` (default: `https://specular.example.com`) - Public base URL of mirror (without trailing slash). Supports hosting at subpaths (e.g., `https://example.com/mirror`). Note that Terraform provider endpoints are served under `/terraform/providers`, and observability endpoints (`/health`, `/metrics`) are served at the root of this base URL.
 - `SPECULAR_PORT` (default: `8080`) - HTTP server port
 - `SPECULAR_HOST` (default: `0.0.0.0`) - Bind address
 - `SPECULAR_READ_TIMEOUT` (default: `30s`) - HTTP read timeout
@@ -70,9 +71,6 @@ All configuration is via environment variables:
 - `SPECULAR_UPSTREAM_TIMEOUT` (default: `60s`) - Upstream request timeout
 - `SPECULAR_UPSTREAM_MAX_RETRIES` (default: `3`) - Max retry attempts
 
-### Mirror Configuration
-- `SPECULAR_BASE_URL` (default: `https://specular.example.com`) - Public base URL of mirror (without trailing slash). Supports hosting at subpaths (e.g., `https://example.com/mirror`). Note that Terraform provider endpoints are served under `/terraform/providers`, and observability endpoints (`/health`, `/metrics`) are served at the root of this base URL.
-
 ### Observability Configuration
 - `SPECULAR_LOG_LEVEL` (default: `info`) - Log level: debug, info, warn, error
 - `SPECULAR_LOG_FORMAT` (default: `json`) - Log format: json, text
@@ -80,7 +78,7 @@ All configuration is via environment variables:
 
 ## API Endpoints
 
-> **Note**: All Terraform provider endpoints are served under the `/terraform/providers` path prefix. This structure allows Specular to potentially support other package registries in the future (e.g., `/docker/registries`, `/npm`, `/pypi`, `/maven`) as a multi-ecosystem pull-through cache.
+> **Note**: All Terraform provider endpoints are served under the `/terraform/providers` path prefix. This structure allows Specular to support other package registries in the future (e.g., `/docker/registries`, `/npm`, `/pypi`, `/maven`) as a multi-ecosystem pull-through cache.
 
 ### Terraform Provider Endpoints
 
@@ -130,7 +128,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, running locally, a
 
 ## Architecture
 
-The mirror consists of several layers:
+The mirror consists of the following layers:
 
 - **HTTP Server** - Handles requests and routing
 - **Mirror Service** - Core cache-or-fetch business logic
@@ -142,7 +140,7 @@ The mirror consists of several layers:
 
 - S3 storage backend
 - Cache invalidation API
-- Pre-warming cache (already supported since the filesystem structure is the same as `terraform providers mirror`)
+- Pre-warming cache (*technically* already supported since the filesystem structure is the same as `terraform providers mirror`)
 - Authentication and authorization
 - Rate limiting
 - Support for other ecosystems (Docker, npm, PyPI, nuget, maven)
