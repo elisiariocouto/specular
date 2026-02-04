@@ -1,4 +1,12 @@
 
+## 2026.2.0 (2026/02/04)
+
+### Miscellaneous Tasks
+
+-  Improve logging. ([1416256d](https://github.com/elisiariocouto/specular/commit/1416256dc5682ff81e5153d17e07c461c25673ec))
+
+
+
 ## 2025.12.4 (2025/12/22)
 
 ### Bug Fixes
