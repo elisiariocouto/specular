@@ -28,7 +28,9 @@ func main() {
 	// Setup logger
 	log := logger.SetupLogger(cfg.LogLevel, cfg.LogFormat)
 
-	log.InfoContext(context.Background(), "Specular starting",
+	log.InfoContext(context.Background(),
+		fmt.Sprintf("Specular starting [version=%s commit=%s build_date=%s port=%d host=%s storage_type=%s cache_dir=%s base_url=%s]",
+			version.Version, version.Commit, version.BuildDate, cfg.Port, cfg.Host, cfg.StorageType, cfg.CacheDir, cfg.BaseURL),
 		slog.String("version", version.Version),
 		slog.String("commit", version.Commit),
 		slog.String("build_date", version.BuildDate),
@@ -45,18 +47,21 @@ func main() {
 	case "filesystem":
 		st, err := storage.NewFilesystemStorage(cfg.CacheDir)
 		if err != nil {
-			log.ErrorContext(context.Background(), "Failed to initialize filesystem storage",
+			log.ErrorContext(context.Background(),
+				fmt.Sprintf("Failed to initialize filesystem storage [error=%s]", err.Error()),
 				slog.String("error", err.Error()))
 			os.Exit(1)
 		}
 		storageBackend = st
-		log.InfoContext(context.Background(), "Filesystem storage initialized",
+		log.InfoContext(context.Background(),
+			fmt.Sprintf("Filesystem storage initialized [cache_dir=%s]", cfg.CacheDir),
 			slog.String("cache_dir", cfg.CacheDir))
 	case "memory":
 		storageBackend = storage.NewMemoryStorage()
 		log.InfoContext(context.Background(), "In-memory storage initialized")
 	default:
-		log.ErrorContext(context.Background(), "Unknown storage type",
+		log.ErrorContext(context.Background(),
+			fmt.Sprintf("Unknown storage type [storage_type=%s]", cfg.StorageType),
 			slog.String("storage_type", cfg.StorageType))
 		os.Exit(1)
 	}
@@ -97,7 +102,8 @@ func main() {
 	go func() {
 		if err := httpServer.Start(); err != nil {
 			if err.Error() != "http: Server closed" {
-				log.ErrorContext(context.Background(), "Server error",
+				log.ErrorContext(context.Background(),
+					fmt.Sprintf("Server error [error=%s]", err.Error()),
 					slog.String("error", err.Error()))
 				os.Exit(1)
 			}
@@ -109,7 +115,8 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
 
 	sig := <-sigChan
-	log.InfoContext(context.Background(), "Received signal",
+	log.InfoContext(context.Background(),
+		fmt.Sprintf("Received signal [signal=%s]", sig.String()),
 		slog.String("signal", sig.String()))
 
 	// Graceful shutdown
@@ -117,7 +124,8 @@ func main() {
 	defer cancel()
 
 	if err := httpServer.Shutdown(ctx); err != nil {
-		log.ErrorContext(context.Background(), "Shutdown error",
+		log.ErrorContext(context.Background(),
+			fmt.Sprintf("Shutdown error [error=%s]", err.Error()),
 			slog.String("error", err.Error()))
 		os.Exit(1)
 	}

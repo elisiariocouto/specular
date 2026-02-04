@@ -52,7 +52,8 @@ func (m *Mirror) GetIndex(ctx context.Context, hostname, namespace, providerType
 
 	// Store index in cache (non-blocking, errors are logged)
 	if err := m.storage.PutIndex(ctx, hostname, namespace, providerType, data); err != nil {
-		slog.Warn("failed to cache index", "hostname", hostname, "namespace", namespace, "type", providerType, "err", err)
+		slog.Warn(fmt.Sprintf("failed to cache index [hostname=%s namespace=%s type=%s err=%s]", hostname, namespace, providerType, err),
+			"hostname", hostname, "namespace", namespace, "type", providerType, "err", err)
 	}
 
 	// Also cache the full versions response if available
@@ -60,7 +61,8 @@ func (m *Mirror) GetIndex(ctx context.Context, hostname, namespace, providerType
 		versionsData, err := json.Marshal(versionsResponse)
 		if err == nil {
 			if err := m.storage.PutVersionsResponse(ctx, hostname, namespace, providerType, versionsData); err != nil {
-				slog.Warn("failed to cache versions response", "hostname", hostname, "namespace", namespace, "type", providerType, "err", err)
+				slog.Warn(fmt.Sprintf("failed to cache versions response [hostname=%s namespace=%s type=%s err=%s]", hostname, namespace, providerType, err),
+					"hostname", hostname, "namespace", namespace, "type", providerType, "err", err)
 			}
 		}
 	}
@@ -86,7 +88,8 @@ func (m *Mirror) GetVersion(ctx context.Context, hostname, namespace, providerTy
 			data, buildErr := m.buildVersionFromCache(ctx, hostname, namespace, providerType, version)
 			// If versions cache is empty, fetch the index first to populate it
 			if buildErr != nil {
-				slog.DebugContext(ctx, "versions cache empty, fetching index first",
+				slog.DebugContext(ctx,
+					fmt.Sprintf("versions cache empty, fetching index first [hostname=%s namespace=%s type=%s version=%s]", hostname, namespace, providerType, version),
 					"hostname", hostname,
 					"namespace", namespace,
 					"type", providerType,
@@ -118,7 +121,8 @@ func (m *Mirror) GetVersion(ctx context.Context, hostname, namespace, providerTy
 
 	// Store rewritten response in cache (non-blocking, errors are logged)
 	if err := m.storage.PutVersion(ctx, hostname, namespace, providerType, version, rewritten); err != nil {
-		slog.Warn("failed to cache rewritten version", "hostname", hostname, "namespace", namespace, "type", providerType, "version", version, "err", err)
+		slog.Warn(fmt.Sprintf("failed to cache rewritten version [hostname=%s namespace=%s type=%s version=%s err=%s]", hostname, namespace, providerType, version, err),
+			"hostname", hostname, "namespace", namespace, "type", providerType, "version", version, "err", err)
 	}
 
 	return rewritten, nil
@@ -178,7 +182,8 @@ func (m *Mirror) buildVersionFromCache(ctx context.Context, hostname, namespace,
 
 	// Store in cache (non-blocking, errors are logged)
 	if err := m.storage.PutVersion(ctx, hostname, namespace, providerType, version, data); err != nil {
-		slog.Warn("failed to cache version from cache build", "hostname", hostname, "namespace", namespace, "type", providerType, "version", version, "err", err)
+		slog.Warn(fmt.Sprintf("failed to cache version from cache build [hostname=%s namespace=%s type=%s version=%s err=%s]", hostname, namespace, providerType, version, err),
+			"hostname", hostname, "namespace", namespace, "type", providerType, "version", version, "err", err)
 	}
 
 	return data, nil
@@ -232,7 +237,8 @@ func (m *Mirror) rewriteArchiveURLs(ctx context.Context, hostname, namespace, pr
 			// Parse OS/arch from platform key (e.g., "linux_amd64" -> linux, amd64)
 			os, arch, err := parsePlatformKey(platform)
 			if err != nil {
-				slog.Warn("invalid platform key format", "platform", platform, "err", err)
+				slog.Warn(fmt.Sprintf("invalid platform key format [platform=%s err=%s]", platform, err),
+					"platform", platform, "err", err)
 				continue
 			}
 

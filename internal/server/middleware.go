@@ -18,7 +18,9 @@ func LoggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 			// Get request ID from context (set by chi middleware)
 			requestID := middleware.GetReqID(r.Context())
 
-			logger.InfoContext(r.Context(), "request started",
+			logger.InfoContext(r.Context(),
+				fmt.Sprintf("request started [request_id=%s method=%s path=%s remote_addr=%s]",
+					requestID, r.Method, r.URL.Path, r.RemoteAddr),
 				slog.String("request_id", requestID),
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
@@ -32,7 +34,9 @@ func LoggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 			next.ServeHTTP(wrapped, r)
 			duration := time.Since(start)
 
-			logger.InfoContext(r.Context(), "request completed",
+			logger.InfoContext(r.Context(),
+				fmt.Sprintf("request completed [request_id=%s method=%s path=%s status_code=%d duration=%s response_size=%d]",
+					requestID, r.Method, r.URL.Path, wrapped.statusCode, duration, wrapped.responseSize),
 				slog.String("request_id", requestID),
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
@@ -79,9 +83,11 @@ func RecoveryMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 			defer func() {
 				if err := recover(); err != nil {
 					requestID := middleware.GetReqID(r.Context())
-					logger.ErrorContext(r.Context(), "panic recovered",
+					errStr := fmt.Sprintf("%v", err)
+					logger.ErrorContext(r.Context(),
+						fmt.Sprintf("panic recovered [request_id=%s error=%s]", requestID, errStr),
 						slog.String("request_id", requestID),
-						slog.String("error", fmt.Sprintf("%v", err)),
+						slog.String("error", errStr),
 					)
 					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				}

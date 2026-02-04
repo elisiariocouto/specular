@@ -40,12 +40,17 @@ func (h *Handlers) handleRequest(
 	fetchData func() (any, error),
 	writeResponse func(any) error,
 ) {
-	// Log request
+	// Convert attrs to both message parts and structured fields
 	attrs := make([]any, len(logAttrs))
+	msgParts := make([]string, 0, len(logAttrs))
 	for i, attr := range logAttrs {
 		attrs[i] = attr
+		msgParts = append(msgParts, fmt.Sprintf("%s=%v", attr.Key, attr.Value))
 	}
-	h.logger.InfoContext(r.Context(), resourceType+" request", attrs...)
+	enrichedMsg := fmt.Sprintf("%s request [%s]", resourceType, strings.Join(msgParts, " "))
+
+	// Log request
+	h.logger.InfoContext(r.Context(), enrichedMsg, attrs...)
 
 	// Fetch data and measure duration
 	start := time.Now()
@@ -56,13 +61,15 @@ func (h *Handlers) handleRequest(
 	if err != nil {
 		if err == mirror.ErrNotFound || err == io.EOF {
 			h.metrics.RecordCacheMiss(resourceType)
-			h.logger.InfoContext(r.Context(), resourceType+" not found", attrs...)
+			notFoundMsg := fmt.Sprintf("%s not found [%s]", resourceType, strings.Join(msgParts, " "))
+			h.logger.InfoContext(r.Context(), notFoundMsg, attrs...)
 			http.NotFound(w, r)
 			return
 		}
 
 		h.metrics.RecordError(resourceType+"_handler", "fetch_failed")
-		h.logger.ErrorContext(r.Context(), "failed to get "+resourceType,
+		errMsg := fmt.Sprintf("failed to get %s [%s error=%s]", resourceType, strings.Join(msgParts, " "), err.Error())
+		h.logger.ErrorContext(r.Context(), errMsg,
 			append(attrs, slog.String("error", err.Error()))...)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -74,7 +81,8 @@ func (h *Handlers) handleRequest(
 
 	// Write response
 	if err := writeResponse(data); err != nil {
-		h.logger.ErrorContext(r.Context(), "failed to write response",
+		h.logger.ErrorContext(r.Context(),
+			fmt.Sprintf("failed to write response [error=%s]", err.Error()),
 			slog.String("error", err.Error()))
 	}
 }
