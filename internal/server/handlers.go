@@ -30,6 +30,14 @@ func NewHandlers(m *mirror.Mirror, metrics *metrics.Metrics, logger *slog.Logger
 	}
 }
 
+// writeJSONResponse is a helper that writes JSON response with standard headers
+func writeJSONResponse(w http.ResponseWriter, data []byte, cacheMaxAge string) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", cacheMaxAge)
+	_, err := w.Write(data)
+	return err
+}
+
 // handleRequest is a helper that handles the common request/error/metrics pattern
 // It takes a fetch function that retrieves the data and a write function that writes the response
 func (h *Handlers) handleRequest(
@@ -130,10 +138,7 @@ func (h *Handlers) IndexHandler(w http.ResponseWriter, r *http.Request) {
 			return h.mirror.GetIndex(r.Context(), hostname, namespace, providerType)
 		},
 		func(data any) error {
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("Cache-Control", "public, max-age=300")
-			_, err := w.Write(data.([]byte))
-			return err
+			return writeJSONResponse(w, data.([]byte), "public, max-age=300")
 		},
 	)
 }
@@ -155,18 +160,9 @@ func (h *Handlers) VersionHandlerWithParams(w http.ResponseWriter, r *http.Reque
 			return h.mirror.GetVersion(r.Context(), hostname, namespace, providerType, version)
 		},
 		func(data any) error {
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("Cache-Control", "public, max-age=300")
-			_, err := w.Write(data.([]byte))
-			return err
+			return writeJSONResponse(w, data.([]byte), "public, max-age=300")
 		},
 	)
-}
-
-// VersionHandler handles GET /:hostname/:namespace/:type/:version.json (legacy, kept for compatibility)
-func (h *Handlers) VersionHandler(w http.ResponseWriter, r *http.Request) {
-	version := chi.URLParam(r, "version")
-	h.VersionHandlerWithParams(w, r, version)
 }
 
 // DownloadHandler handles archive downloads with explicit parameters
