@@ -1,4 +1,17 @@
 
+## 2026.2.1 (2026/02/04)
+
+### Bug Fixes
+
+-  Fix archive URL build function to include /terraform/providers prefix ([08cb3282](https://github.com/elisiariocouto/specular/commit/08cb32825414a25638fa22fe7c53ae0ac81437ac))
+
+
+### Miscellaneous Tasks
+
+-  Update dependencies. ([6c2e1cc3](https://github.com/elisiariocouto/specular/commit/6c2e1cc310a1fc2df5bb66911a8db2fc85959297))
+
+
+
 ## 2026.2.0 (2026/02/04)
 
 ### Miscellaneous Tasks
