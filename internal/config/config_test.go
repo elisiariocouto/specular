@@ -42,6 +42,7 @@ func TestLoadOverrides(t *testing.T) {
 	t.Setenv("SPECULAR_CACHE_DIR", "/tmp/specular-cache")
 	t.Setenv("SPECULAR_UPSTREAM_TIMEOUT", "13s")
 	t.Setenv("SPECULAR_UPSTREAM_MAX_RETRIES", "5")
+	t.Setenv("SPECULAR_INDEX_TTL", "30m")
 	t.Setenv("SPECULAR_BASE_URL", "https://example.com")
 	t.Setenv("SPECULAR_LOG_LEVEL", "debug")
 	t.Setenv("SPECULAR_LOG_FORMAT", "text")
@@ -67,6 +68,9 @@ func TestLoadOverrides(t *testing.T) {
 	if cfg.UpstreamTimeout != 13*time.Second || cfg.MaxRetries != 5 {
 		t.Fatalf("unexpected upstream settings: timeout %v retries %d", cfg.UpstreamTimeout, cfg.MaxRetries)
 	}
+	if cfg.IndexTTL != 30*time.Minute {
+		t.Fatalf("expected index TTL 30m, got %v", cfg.IndexTTL)
+	}
 	if cfg.BaseURL != "https://example.com" {
 		t.Fatalf("expected base URL https://example.com, got %s", cfg.BaseURL)
 	}
@@ -91,6 +95,7 @@ func TestLoadInvalidEnv(t *testing.T) {
 		{name: "shutdown timeout", envKey: "SPECULAR_SHUTDOWN_TIMEOUT", envVal: "1x", errorOn: "SPECULAR_SHUTDOWN_TIMEOUT must be a valid duration"},
 		{name: "upstream timeout", envKey: "SPECULAR_UPSTREAM_TIMEOUT", envVal: "1x", errorOn: "SPECULAR_UPSTREAM_TIMEOUT must be a valid duration"},
 		{name: "max retries", envKey: "SPECULAR_UPSTREAM_MAX_RETRIES", envVal: "one", errorOn: "SPECULAR_UPSTREAM_MAX_RETRIES must be a valid integer"},
+		{name: "index ttl", envKey: "SPECULAR_INDEX_TTL", envVal: "notaduration", errorOn: "SPECULAR_INDEX_TTL must be a valid duration"},
 		{name: "metrics", envKey: "SPECULAR_METRICS_ENABLED", envVal: "maybe", errorOn: "SPECULAR_METRICS_ENABLED must be true or false"},
 	}
 
@@ -119,6 +124,7 @@ func TestValidateAggregatesErrors(t *testing.T) {
 		CacheDir:        "",
 		UpstreamTimeout: 0,
 		MaxRetries:      -1,
+		IndexTTL:        -1,
 		BaseURL:         "http://",
 		LogLevel:        "nope",
 		LogFormat:       "xml",
@@ -137,6 +143,7 @@ func TestValidateAggregatesErrors(t *testing.T) {
 		"shutdown timeout must be positive",
 		"upstream timeout must be positive",
 		"max retries must not be negative",
+		"index TTL must not be negative",
 		"cache directory must not be empty",
 		"base URL must be a valid URL with scheme and host",
 		"log level must be debug, info, warn, or error",

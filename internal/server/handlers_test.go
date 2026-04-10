@@ -99,7 +99,7 @@ func createTestMirror(indexData []byte, indexErr error, versionData []byte, vers
 	upstreamLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	upstreamClient := mirror.NewUpstreamClient(30, 2, 1, upstreamLogger)
 
-	return mirror.NewMirror(storage, upstreamClient, "http://localhost:8080")
+	return mirror.NewMirror(storage, upstreamClient, "http://localhost:8080", 0)
 }
 
 // TestIndexHandler_Success tests successful index request

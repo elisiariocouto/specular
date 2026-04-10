@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"math"
 	"sync"
+	"time"
 )
 
 // MemoryStorage implements Storage using an in-memory map
@@ -14,6 +16,7 @@ type MemoryStorage struct {
 	data              map[string][]byte
 	archives          map[string][]byte
 	versionsResponses map[string][]byte
+	timestamps        map[string]time.Time
 }
 
 // NewMemoryStorage creates a new in-memory storage backend
@@ -22,6 +25,7 @@ func NewMemoryStorage() *MemoryStorage {
 		data:              make(map[string][]byte),
 		archives:          make(map[string][]byte),
 		versionsResponses: make(map[string][]byte),
+		timestamps:        make(map[string]time.Time),
 	}
 }
 
@@ -32,9 +36,31 @@ func (m *MemoryStorage) GetIndex(ctx context.Context, hostname, namespace, provi
 }
 
 // PutIndex stores the index.json for a provider
-func (m *MemoryStorage) PutIndex(ctx context.Context, hostname, namespace, providerType string, data []byte) error {
+func (m *MemoryStorage) PutIndex(_ context.Context, hostname, namespace, providerType string, data []byte) error {
 	key := indexKey(hostname, namespace, providerType)
-	return m.put(key, data)
+	m.mu.Lock()
+	m.data[key] = bytes.Clone(data)
+	m.timestamps[key] = time.Now()
+	m.mu.Unlock()
+	return nil
+}
+
+// IndexAge returns the age of the cached index.json for a provider.
+func (m *MemoryStorage) IndexAge(_ context.Context, hostname, namespace, providerType string) (time.Duration, bool, error) {
+	key := indexKey(hostname, namespace, providerType)
+	m.mu.RLock()
+	_, dataExists := m.data[key]
+	ts, tsExists := m.timestamps[key]
+	m.mu.RUnlock()
+	if !dataExists {
+		return 0, false, nil
+	}
+	if !tsExists {
+		// Data exists but no timestamp (written before TTL feature).
+		// Treat as maximally old to trigger a refresh.
+		return time.Duration(math.MaxInt64), true, nil
+	}
+	return time.Since(ts), true, nil
 }
 
 // GetVersion retrieves the cached version.json for a specific provider version
@@ -137,5 +163,6 @@ func (m *MemoryStorage) Clear() {
 	m.data = make(map[string][]byte)
 	m.archives = make(map[string][]byte)
 	m.versionsResponses = make(map[string][]byte)
+	m.timestamps = make(map[string]time.Time)
 	m.mu.Unlock()
 }

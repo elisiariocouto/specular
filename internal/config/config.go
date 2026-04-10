@@ -29,7 +29,8 @@ type Config struct {
 	DiscoveryCacheTTL time.Duration
 
 	// Mirror configuration
-	BaseURL string
+	BaseURL  string
+	IndexTTL time.Duration
 
 	// Observability
 	LogLevel       string
@@ -52,6 +53,7 @@ func Load() (*Config, error) {
 		MaxRetries:        3,
 		DiscoveryCacheTTL: 1 * time.Hour,
 		BaseURL:           "https://specular.example.com",
+		IndexTTL:          1 * time.Hour,
 		LogLevel:          "info",
 		LogFormat:         "json",
 		MetricsEnabled:    true,
@@ -95,6 +97,10 @@ func Load() (*Config, error) {
 	}
 
 	if err := setEnvDuration("SPECULAR_DISCOVERY_CACHE_TTL", &cfg.DiscoveryCacheTTL, "must be a valid duration (e.g., 1h)"); err != nil {
+		return nil, err
+	}
+
+	if err := setEnvDuration("SPECULAR_INDEX_TTL", &cfg.IndexTTL, "must be a valid duration (e.g., 1h)"); err != nil {
 		return nil, err
 	}
 
@@ -152,6 +158,10 @@ func (c *Config) Validate() error {
 
 	if c.MaxRetries < 0 {
 		errs = append(errs, errors.New("max retries must not be negative"))
+	}
+
+	if c.IndexTTL < 0 {
+		errs = append(errs, errors.New("index TTL must not be negative"))
 	}
 
 	if c.CacheDir == "" {

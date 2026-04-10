@@ -5,7 +5,61 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 )
+
+func TestMemoryStorage_IndexAge_NotFound(t *testing.T) {
+	m := NewMemoryStorage()
+	ctx := context.Background()
+
+	age, exists, err := m.IndexAge(ctx, "registry.terraform.io", "hashicorp", "aws")
+	if err != nil {
+		t.Fatalf("IndexAge() error = %v", err)
+	}
+	if exists {
+		t.Error("IndexAge() exists = true, want false for missing index")
+	}
+	if age != 0 {
+		t.Errorf("IndexAge() age = %v, want 0 for missing index", age)
+	}
+}
+
+func TestMemoryStorage_IndexAge_AfterPut(t *testing.T) {
+	m := NewMemoryStorage()
+	ctx := context.Background()
+
+	err := m.PutIndex(ctx, "registry.terraform.io", "hashicorp", "aws", []byte(`{"versions":{}}`))
+	if err != nil {
+		t.Fatalf("PutIndex() error = %v", err)
+	}
+
+	age, exists, err := m.IndexAge(ctx, "registry.terraform.io", "hashicorp", "aws")
+	if err != nil {
+		t.Fatalf("IndexAge() error = %v", err)
+	}
+	if !exists {
+		t.Error("IndexAge() exists = false, want true after PutIndex")
+	}
+	if age > 5*time.Second {
+		t.Errorf("IndexAge() age = %v, expected < 5s for freshly written index", age)
+	}
+}
+
+func TestMemoryStorage_IndexAge_AfterClear(t *testing.T) {
+	m := NewMemoryStorage()
+	ctx := context.Background()
+
+	m.PutIndex(ctx, "registry.terraform.io", "hashicorp", "aws", []byte("data"))
+	m.Clear()
+
+	_, exists, err := m.IndexAge(ctx, "registry.terraform.io", "hashicorp", "aws")
+	if err != nil {
+		t.Fatalf("IndexAge() error = %v", err)
+	}
+	if exists {
+		t.Error("IndexAge() exists = true, want false after Clear")
+	}
+}
 
 func TestNewMemoryStorage(t *testing.T) {
 	m := NewMemoryStorage()
