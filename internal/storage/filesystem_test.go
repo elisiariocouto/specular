@@ -7,7 +7,56 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
+
+func TestFilesystemStorage_IndexAge_NotFound(t *testing.T) {
+	fs, _ := NewFilesystemStorage(t.TempDir())
+	ctx := context.Background()
+
+	age, exists, err := fs.IndexAge(ctx, "registry.terraform.io", "hashicorp", "aws")
+	if err != nil {
+		t.Fatalf("IndexAge() error = %v", err)
+	}
+	if exists {
+		t.Error("IndexAge() exists = true, want false for missing index")
+	}
+	if age != 0 {
+		t.Errorf("IndexAge() age = %v, want 0 for missing index", age)
+	}
+}
+
+func TestFilesystemStorage_IndexAge_AfterPut(t *testing.T) {
+	fs, _ := NewFilesystemStorage(t.TempDir())
+	ctx := context.Background()
+
+	err := fs.PutIndex(ctx, "registry.terraform.io", "hashicorp", "aws", []byte(`{"versions":{}}`))
+	if err != nil {
+		t.Fatalf("PutIndex() error = %v", err)
+	}
+
+	age, exists, err := fs.IndexAge(ctx, "registry.terraform.io", "hashicorp", "aws")
+	if err != nil {
+		t.Fatalf("IndexAge() error = %v", err)
+	}
+	if !exists {
+		t.Error("IndexAge() exists = false, want true after PutIndex")
+	}
+	// Age should be very small (just written)
+	if age > 5*time.Second {
+		t.Errorf("IndexAge() age = %v, expected < 5s for freshly written index", age)
+	}
+}
+
+func TestFilesystemStorage_IndexAge_InvalidPath(t *testing.T) {
+	fs, _ := NewFilesystemStorage(t.TempDir())
+	ctx := context.Background()
+
+	_, _, err := fs.IndexAge(ctx, "", "hashicorp", "aws")
+	if err == nil {
+		t.Error("IndexAge() with empty hostname expected error but got nil")
+	}
+}
 
 func TestNewFilesystemStorage(t *testing.T) {
 	tmpDir := t.TempDir()

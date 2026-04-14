@@ -10,53 +10,113 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/elisiariocouto/specular/internal/storage"
 )
 
 // Mirror handles caching and proxying of Terraform providers
 type Mirror struct {
-	storage  storage.Storage
-	upstream *UpstreamClient
-	baseURL  string
+	storage    storage.Storage
+	ageChecker storage.CacheAgeChecker
+	upstream   *UpstreamClient
+	baseURL    string
+	indexTTL   time.Duration
+	refresher  *IndexRefresher
 }
 
 // NewMirror creates a new mirror service
-func NewMirror(store storage.Storage, upstream *UpstreamClient, baseURL string) *Mirror {
+func NewMirror(store storage.Storage, upstream *UpstreamClient, baseURL string, indexTTL time.Duration) *Mirror {
+	var ageChecker storage.CacheAgeChecker
+	if ac, ok := store.(storage.CacheAgeChecker); ok {
+		ageChecker = ac
+	}
 	return &Mirror{
-		storage:  store,
-		upstream: upstream,
-		baseURL:  baseURL,
+		storage:    store,
+		ageChecker: ageChecker,
+		upstream:   upstream,
+		baseURL:    baseURL,
+		indexTTL:   indexTTL,
+		refresher:  NewIndexRefresher(),
 	}
 }
 
-// GetIndex returns the index for a provider, using cache or fetching from upstream
+// Shutdown cancels all background refresh goroutines and waits for them to complete.
+func (m *Mirror) Shutdown() {
+	m.refresher.Shutdown()
+}
+
+// GetIndex returns the index for a provider, using cache or fetching from upstream.
+// If cached data is stale (older than indexTTL), it is returned immediately while
+// a background refresh is triggered asynchronously.
 func (m *Mirror) GetIndex(ctx context.Context, hostname, namespace, providerType string) ([]byte, error) {
 	// Try to get from cache
 	cachedData, err := m.storage.GetIndex(ctx, hostname, namespace, providerType)
 	if err == nil {
+		// Cache hit — check if stale and maybe trigger background refresh
+		m.maybeRefreshIndex(hostname, namespace, providerType)
 		return cachedData, nil
 	}
 
-	// Cache miss, fetch from upstream
+	// Cache miss, fetch from upstream synchronously
+	return m.fetchAndCacheIndex(ctx, hostname, namespace, providerType)
+}
+
+// maybeRefreshIndex checks if the cached index is stale and triggers a background refresh if needed.
+// This never blocks the caller — stale data is always returned immediately.
+func (m *Mirror) maybeRefreshIndex(hostname, namespace, providerType string) {
+	if m.ageChecker == nil || m.indexTTL <= 0 {
+		return
+	}
+
+	age, exists, err := m.ageChecker.IndexAge(context.Background(), hostname, namespace, providerType)
+	if err != nil {
+		slog.Warn(fmt.Sprintf("failed to check index age [hostname=%s namespace=%s type=%s err=%s]",
+			hostname, namespace, providerType, err),
+			"hostname", hostname, "namespace", namespace, "type", providerType, "err", err)
+		return
+	}
+
+	if !exists || age <= m.indexTTL {
+		return
+	}
+
+	m.refresher.TryRefresh(hostname, namespace, providerType, func(ctx context.Context) {
+		slog.Info(fmt.Sprintf("background refresh started [hostname=%s namespace=%s type=%s age=%s ttl=%s]",
+			hostname, namespace, providerType, age, m.indexTTL),
+			"hostname", hostname, "namespace", namespace, "type", providerType,
+			"age", age.String(), "ttl", m.indexTTL.String())
+
+		if _, err := m.fetchAndCacheIndex(ctx, hostname, namespace, providerType); err != nil {
+			slog.Warn(fmt.Sprintf("background refresh failed, stale data will continue to be served [hostname=%s namespace=%s type=%s err=%s]",
+				hostname, namespace, providerType, err),
+				"hostname", hostname, "namespace", namespace, "type", providerType, "err", err)
+			return
+		}
+
+		slog.Info(fmt.Sprintf("background refresh completed [hostname=%s namespace=%s type=%s]",
+			hostname, namespace, providerType),
+			"hostname", hostname, "namespace", namespace, "type", providerType)
+	})
+}
+
+// fetchAndCacheIndex fetches the index from upstream and stores both index.json and versions.json in cache.
+func (m *Mirror) fetchAndCacheIndex(ctx context.Context, hostname, namespace, providerType string) ([]byte, error) {
 	indexResponse, versionsResponse, err := m.upstream.FetchIndex(ctx, hostname, namespace, providerType)
 	if err != nil {
 		return nil, err
 	}
 
-	// Marshal index response to JSON
 	data, err := json.Marshal(indexResponse)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal index response: %w", err)
 	}
 
-	// Store index in cache (non-blocking, errors are logged)
 	if err := m.storage.PutIndex(ctx, hostname, namespace, providerType, data); err != nil {
 		slog.Warn(fmt.Sprintf("failed to cache index [hostname=%s namespace=%s type=%s err=%s]", hostname, namespace, providerType, err),
 			"hostname", hostname, "namespace", namespace, "type", providerType, "err", err)
 	}
 
-	// Also cache the full versions response if available
 	if versionsResponse != nil {
 		versionsData, err := json.Marshal(versionsResponse)
 		if err == nil {

@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// MockStorage implements the Storage interface for testing
+// MockStorage implements the Storage and CacheAgeChecker interfaces for testing
 type MockStorage struct {
 	indices           map[string][]byte
 	versions          map[string][]byte
@@ -26,6 +26,9 @@ type MockStorage struct {
 	getIndexErr       error
 	getVersionErr     error
 	getArchiveErr     error
+	// CacheAgeChecker support
+	indexAge    time.Duration
+	indexExists bool
 }
 
 func NewMockStorage() *MockStorage {
@@ -35,6 +38,10 @@ func NewMockStorage() *MockStorage {
 		versionsResponses: make(map[string][]byte),
 		archives:          make(map[string][]byte),
 	}
+}
+
+func (m *MockStorage) IndexAge(_ context.Context, _, _, _ string) (time.Duration, bool, error) {
+	return m.indexAge, m.indexExists, nil
 }
 
 func (m *MockStorage) GetIndex(ctx context.Context, hostname, namespace, providerType string) ([]byte, error) {
@@ -139,7 +146,7 @@ func TestGetIndex_CacheHit(t *testing.T) {
 	defer server.Close()
 
 	upstream := newTestUpstreamClientForMirror(server)
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	hostname, namespace, providerType := "registry.terraform.io", "hashicorp", "aws"
 	cachedData := []byte(`{"versions": {"1.0.0": {}}}`)
@@ -182,7 +189,7 @@ func TestGetIndex_CacheMiss_FetchUpstream(t *testing.T) {
 	defer server.Close()
 
 	upstream := newTestUpstreamClientForMirror(server)
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	hostname, namespace, providerType := "registry.terraform.io", "hashicorp", "aws"
 
@@ -210,7 +217,7 @@ func TestGetIndex_UpstreamError(t *testing.T) {
 	defer server.Close()
 
 	upstream := newTestUpstreamClientForMirror(server)
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	_, err := mirror.GetIndex(context.Background(), "registry.terraform.io", "hashicorp", "aws")
 	if err == nil {
@@ -227,7 +234,7 @@ func TestGetVersion_CacheHit(t *testing.T) {
 	defer server.Close()
 
 	upstream := newTestUpstreamClientForMirror(server)
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	hostname, namespace, providerType, version := "registry.terraform.io", "hashicorp", "aws", "1.0.0"
 	cachedData := []byte(`{"archives": {"linux_amd64": {"url": "http://localhost:8080/download/..."}}}`)
@@ -264,7 +271,7 @@ func TestGetVersion_CacheMiss_FetchUpstream(t *testing.T) {
 	defer server.Close()
 
 	upstream := newTestUpstreamClientForMirror(server)
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	hostname, namespace, providerType, version := "registry.terraform.io", "hashicorp", "aws", "1.0.0"
 
@@ -305,7 +312,7 @@ func TestGetVersion_BuildFromCache(t *testing.T) {
 	defer server.Close()
 
 	upstream := newTestUpstreamClientForMirror(server)
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	// This will fail due to service discovery not being configured
 	_, err := mirror.GetVersion(context.Background(), "registry.terraform.io", "hashicorp", "aws", "1.0.0")
@@ -328,7 +335,7 @@ func TestGetVersion_NotFound(t *testing.T) {
 	defer server.Close()
 
 	upstream := newTestUpstreamClientForMirror(server)
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	_, err := mirror.GetVersion(context.Background(), "registry.terraform.io", "hashicorp", "aws", "99.0.0")
 	if err == nil {
@@ -345,7 +352,7 @@ func TestGetArchive_CacheHit(t *testing.T) {
 	defer server.Close()
 
 	upstream := newTestUpstreamClientForMirror(server)
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	archivePath := "registry.terraform.io/hashicorp/aws/terraform-provider-aws_1.0.0_linux_amd64.zip"
 	archiveContent := []byte("archive content")
@@ -392,7 +399,7 @@ func TestGetArchive_CacheMiss_FetchUpstream(t *testing.T) {
 	defer server.Close()
 
 	upstream := newTestUpstreamClientForMirror(server)
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	archivePath := "registry.terraform.io/hashicorp/aws/terraform-provider-aws_1.0.0_linux_amd64.zip"
 
@@ -422,7 +429,7 @@ func TestGetArchive_CacheMiss_FetchUpstream(t *testing.T) {
 func TestRewriteArchiveURLs(t *testing.T) {
 	mockStorage := NewMockStorage()
 	upstream := newTestUpstreamClientForMirror(httptest.NewTLSServer(http.HandlerFunc(nil)))
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	versionResp := VersionResponse{
 		Archives: map[string]Archive{
@@ -458,7 +465,7 @@ func TestRewriteArchiveURLs(t *testing.T) {
 func TestRewriteArchiveURLs_InvalidPlatformKey(t *testing.T) {
 	mockStorage := NewMockStorage()
 	upstream := newTestUpstreamClientForMirror(httptest.NewTLSServer(http.HandlerFunc(nil)))
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	versionResp := VersionResponse{
 		Archives: map[string]Archive{
@@ -521,7 +528,7 @@ func TestExtractFilename(t *testing.T) {
 
 	mockStorage := NewMockStorage()
 	upstream := newTestUpstreamClientForMirror(httptest.NewTLSServer(http.HandlerFunc(nil)))
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -557,7 +564,7 @@ func TestBuildDownloadURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mirror := NewMirror(mockStorage, upstream, tt.baseURL)
+			mirror := NewMirror(mockStorage, upstream, tt.baseURL, 0)
 			got := mirror.buildDownloadURL("registry.terraform.io", "hashicorp", "aws", "1.0.0", "linux", "amd64", "terraform-provider-aws_1.0.0_linux_amd64.zip")
 			if got != tt.wantURL {
 				t.Errorf("buildDownloadURL = %q, want %q", got, tt.wantURL)
@@ -630,7 +637,7 @@ func TestNewMirror(t *testing.T) {
 	mockStorage := NewMockStorage()
 	upstream := newTestUpstreamClientForMirror(httptest.NewTLSServer(http.HandlerFunc(nil)))
 
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 	if mirror == nil {
 		t.Fatal("NewMirror returned nil")
 	}
@@ -673,7 +680,7 @@ func TestBuildVersionFromCache(t *testing.T) {
 	mockStorage.PutVersionsResponse(context.Background(), "registry.terraform.io", "hashicorp", "aws", versionsData)
 
 	upstream := newTestUpstreamClientForMirror(httptest.NewTLSServer(http.HandlerFunc(nil)))
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	result, err := mirror.buildVersionFromCache(context.Background(), "registry.terraform.io", "hashicorp", "aws", "1.0.0")
 	if err != nil {
@@ -716,7 +723,7 @@ func TestBuildVersionFromCache_NotFound(t *testing.T) {
 	mockStorage.PutVersionsResponse(context.Background(), "registry.terraform.io", "hashicorp", "aws", versionsData)
 
 	upstream := newTestUpstreamClientForMirror(httptest.NewTLSServer(http.HandlerFunc(nil)))
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	_, err := mirror.buildVersionFromCache(context.Background(), "registry.terraform.io", "hashicorp", "aws", "99.0.0")
 	if err != ErrNotFound {
@@ -728,7 +735,7 @@ func TestBuildVersionFromCache_NotFound(t *testing.T) {
 func TestBuildVersionFromCache_NoVersionsCache(t *testing.T) {
 	mockStorage := NewMockStorage()
 	upstream := newTestUpstreamClientForMirror(httptest.NewTLSServer(http.HandlerFunc(nil)))
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	_, err := mirror.buildVersionFromCache(context.Background(), "registry.terraform.io", "hashicorp", "aws", "1.0.0")
 	if err == nil {
@@ -758,7 +765,7 @@ func TestGetIndex_CacheWriteError(t *testing.T) {
 	defer server.Close()
 
 	upstream := newTestUpstreamClientForMirror(server)
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	// Will fail due to service discovery not being configured
 	_, err := mirror.GetIndex(context.Background(), "registry.terraform.io", "hashicorp", "aws")
@@ -791,7 +798,7 @@ func TestGetVersion_CacheWriteError(t *testing.T) {
 	defer server.Close()
 
 	upstream := newTestUpstreamClientForMirror(server)
-	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080")
+	mirror := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
 
 	// Will fail due to service discovery not being configured
 	_, err := mirror.GetVersion(context.Background(), "registry.terraform.io", "hashicorp", "aws", "1.0.0")
@@ -802,4 +809,192 @@ func TestGetVersion_CacheWriteError(t *testing.T) {
 
 	// The error is expected because the test server doesn't provide service discovery
 	t.Logf("GetVersion failed as expected without service discovery: %v", err)
+}
+
+// TestGetIndex_FreshCache_NoRefresh verifies that a fresh cache hit does not trigger upstream
+func TestGetIndex_FreshCache_NoRefresh(t *testing.T) {
+	mockStorage := NewMockStorage()
+	mockStorage.indexAge = 5 * time.Minute
+	mockStorage.indexExists = true
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("upstream should not be called when cache is fresh")
+	}))
+	defer server.Close()
+
+	upstream := newTestUpstreamClientForMirror(server)
+	m := NewMirror(mockStorage, upstream, "http://localhost:8080", 1*time.Hour)
+
+	cachedData := []byte(`{"versions": {"1.0.0": {}}}`)
+	mockStorage.PutIndex(context.Background(), "registry.terraform.io", "hashicorp", "aws", cachedData)
+
+	result, err := m.GetIndex(context.Background(), "registry.terraform.io", "hashicorp", "aws")
+	if err != nil {
+		t.Fatalf("GetIndex failed: %v", err)
+	}
+	if !bytes.Equal(result, cachedData) {
+		t.Errorf("GetIndex = %q, want %q", result, cachedData)
+	}
+}
+
+// TestGetIndex_StaleCache_TriggersBackgroundRefresh verifies that stale cache returns
+// cached data immediately and triggers an async upstream refresh
+func TestGetIndex_StaleCache_TriggersBackgroundRefresh(t *testing.T) {
+	mockStorage := NewMockStorage()
+	mockStorage.indexAge = 2 * time.Hour
+	mockStorage.indexExists = true
+
+	versionsServed := make(chan struct{}, 1)
+
+	// Use a server that serves proper discovery + versions response
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, ".well-known/terraform.json") {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"providers.v1": "/v1/providers/"}`)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(RegistryVersionsResponse{
+			Versions: []RegistryVersion{
+				{Version: "1.0.0", Platforms: []RegistryPlatform{{OS: "linux", Arch: "amd64"}}},
+				{Version: "2.0.0", Platforms: []RegistryPlatform{{OS: "linux", Arch: "amd64"}}},
+			},
+		})
+		select {
+		case versionsServed <- struct{}{}:
+		default:
+		}
+	}))
+	defer server.Close()
+
+	client := server.Client()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	upstream := &UpstreamClient{
+		httpClient:     client,
+		maxRetries:     0,
+		logger:         logger,
+		discoveryCache: NewDiscoveryCache(1*time.Second, client, logger),
+	}
+
+	// Use the test server's host as the "registry" hostname so discovery works
+	serverHost := strings.TrimPrefix(server.URL, "https://")
+	m := NewMirror(mockStorage, upstream, "http://localhost:8080", 1*time.Hour)
+	defer m.Shutdown()
+
+	cachedData := []byte(`{"versions": {"1.0.0": {}}}`)
+	mockStorage.PutIndex(context.Background(), serverHost, "hashicorp", "aws", cachedData)
+	mockStorage.indexAge = 2 * time.Hour
+	mockStorage.indexExists = true
+
+	// Should return stale data immediately
+	result, err := m.GetIndex(context.Background(), serverHost, "hashicorp", "aws")
+	if err != nil {
+		t.Fatalf("GetIndex failed: %v", err)
+	}
+	if !bytes.Equal(result, cachedData) {
+		t.Errorf("GetIndex = %q, want %q", result, cachedData)
+	}
+
+	// Wait for the background refresh to serve the versions response
+	select {
+	case <-versionsServed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("background refresh did not call upstream within timeout")
+	}
+
+	// Give the goroutine a moment to write the cache after receiving the response
+	time.Sleep(50 * time.Millisecond)
+
+	// After refresh, the cached index should be updated with new data including version 2.0.0
+	updatedData, err := mockStorage.GetIndex(context.Background(), serverHost, "hashicorp", "aws")
+	if err != nil {
+		t.Fatalf("GetIndex after refresh failed: %v", err)
+	}
+	if !strings.Contains(string(updatedData), "2.0.0") {
+		t.Errorf("updated index should contain version 2.0.0, got: %s", updatedData)
+	}
+}
+
+// TestGetIndex_StaleCache_UpstreamFails_ServesStaleData verifies that when upstream
+// fails during background refresh, stale data continues to be served without error
+func TestGetIndex_StaleCache_UpstreamFails_ServesStaleData(t *testing.T) {
+	mockStorage := NewMockStorage()
+	mockStorage.indexAge = 2 * time.Hour
+	mockStorage.indexExists = true
+
+	// Server that always returns errors for provider requests
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, ".well-known/terraform.json") {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"providers.v1": "/v1/providers/"}`)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := server.Client()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	upstream := &UpstreamClient{
+		httpClient:     client,
+		maxRetries:     0,
+		logger:         logger,
+		discoveryCache: NewDiscoveryCache(1*time.Second, client, logger),
+	}
+
+	serverHost := strings.TrimPrefix(server.URL, "https://")
+	m := NewMirror(mockStorage, upstream, "http://localhost:8080", 1*time.Hour)
+
+	cachedData := []byte(`{"versions": {"1.0.0": {}}}`)
+	mockStorage.PutIndex(context.Background(), serverHost, "hashicorp", "aws", cachedData)
+	mockStorage.indexAge = 2 * time.Hour
+	mockStorage.indexExists = true
+
+	// First call: returns stale data, triggers background refresh
+	result, err := m.GetIndex(context.Background(), serverHost, "hashicorp", "aws")
+	if err != nil {
+		t.Fatalf("GetIndex should not fail with stale data: %v", err)
+	}
+	if !bytes.Equal(result, cachedData) {
+		t.Errorf("GetIndex = %q, want %q", result, cachedData)
+	}
+
+	// Wait for background refresh to complete (it will fail)
+	m.Shutdown()
+
+	// Second call: should still return the same stale data (unchanged by failed refresh)
+	m2 := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
+	result2, err := m2.GetIndex(context.Background(), serverHost, "hashicorp", "aws")
+	if err != nil {
+		t.Fatalf("GetIndex should not fail after failed refresh: %v", err)
+	}
+	if !bytes.Equal(result2, cachedData) {
+		t.Errorf("GetIndex after failed refresh = %q, want %q", result2, cachedData)
+	}
+}
+
+// TestGetIndex_ZeroTTL_DisablesRevalidation verifies that TTL=0 disables background refresh
+func TestGetIndex_ZeroTTL_DisablesRevalidation(t *testing.T) {
+	mockStorage := NewMockStorage()
+	mockStorage.indexAge = 2 * time.Hour
+	mockStorage.indexExists = true
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("upstream should not be called when TTL is 0")
+	}))
+	defer server.Close()
+
+	upstream := newTestUpstreamClientForMirror(server)
+	m := NewMirror(mockStorage, upstream, "http://localhost:8080", 0)
+
+	cachedData := []byte(`{"versions": {"1.0.0": {}}}`)
+	mockStorage.PutIndex(context.Background(), "registry.terraform.io", "hashicorp", "aws", cachedData)
+
+	result, err := m.GetIndex(context.Background(), "registry.terraform.io", "hashicorp", "aws")
+	if err != nil {
+		t.Fatalf("GetIndex failed: %v", err)
+	}
+	if !bytes.Equal(result, cachedData) {
+		t.Errorf("GetIndex = %q, want %q", result, cachedData)
+	}
 }

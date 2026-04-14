@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"golang.org/x/exp/slices"
 )
@@ -107,6 +108,22 @@ func (fs *FilesystemStorage) ExistsArchive(ctx context.Context, path string) (bo
 		return false, nil
 	}
 	return false, err
+}
+
+// IndexAge returns the age of the cached index.json by checking file modification time.
+func (fs *FilesystemStorage) IndexAge(_ context.Context, hostname, namespace, providerType string) (time.Duration, bool, error) {
+	if err := validateProviderPath(hostname, namespace, providerType); err != nil {
+		return 0, false, err
+	}
+	path := fs.indexPath(hostname, namespace, providerType)
+	info, err := os.Stat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return 0, false, nil
+		}
+		return 0, false, fmt.Errorf("failed to stat index file: %w", err)
+	}
+	return time.Since(info.ModTime()), true, nil
 }
 
 // GetVersionsResponse retrieves the cached full versions API response

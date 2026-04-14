@@ -75,7 +75,11 @@ func main() {
 	)
 
 	// Initialize mirror service
-	mirrorService := mirror.NewMirror(storageBackend, upstreamClient, cfg.BaseURL)
+	mirrorService := mirror.NewMirror(storageBackend, upstreamClient, cfg.BaseURL, cfg.IndexTTL)
+
+	log.InfoContext(context.Background(),
+		fmt.Sprintf("Mirror service initialized [index_ttl=%s]", cfg.IndexTTL),
+		slog.String("index_ttl", cfg.IndexTTL.String()))
 
 	// Initialize metrics conditionally
 	var m *metrics.Metrics
@@ -118,6 +122,9 @@ func main() {
 	log.InfoContext(context.Background(),
 		fmt.Sprintf("Received signal [signal=%s]", sig.String()),
 		slog.String("signal", sig.String()))
+
+	// Cancel background refreshes before draining HTTP connections
+	mirrorService.Shutdown()
 
 	// Graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
