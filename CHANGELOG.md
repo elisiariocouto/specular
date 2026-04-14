@@ -1,4 +1,17 @@
 
+## 2026.4.0 (2026/04/14)
+
+### Bug Fixes
+
+-  Add stale-while-revalidate caching for provider index metadata (#5) ([f1c26fa0](https://github.com/elisiariocouto/specular/commit/f1c26fa03b3caa685f042e7a273f01ab186f2c36))
+
+
+### Refactor
+
+- **upstream:** Consolidate duplicate retry logic (#2) ([c4d341b7](https://github.com/elisiariocouto/specular/commit/c4d341b767765255b3713a3473565a8a50c62f89))
+
+
+
 ## 2026.2.1 (2026/02/04)
 
 ### Bug Fixes
